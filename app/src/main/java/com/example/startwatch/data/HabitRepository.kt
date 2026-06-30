@@ -17,7 +17,7 @@ class HabitRepository(private val habitDao: HabitDao) {
         return habitDao.getHabitsWithTodayProgressFlow(todayStr)
     }
 
-    suspend fun addHabit(name: String, dailyGoalMs: Long, iconName: String) = withContext(Dispatchers.IO) {
+    suspend fun addHabit(name: String, dailyGoalMs: Long, iconName: String, type: String = "TIME") = withContext(Dispatchers.IO) {
         val habit = HabitEntity(
             id = UUID.randomUUID().toString(),
             userId = "local_user",
@@ -25,6 +25,7 @@ class HabitRepository(private val habitDao: HabitDao) {
             createdAt = java.time.Instant.now().toString(),
             dailyGoalMs = dailyGoalMs,
             iconName = iconName,
+            type = type,
             syncStatus = "PENDING_INSERT"
         )
         habitDao.insertHabit(habit)
@@ -51,14 +52,15 @@ class HabitRepository(private val habitDao: HabitDao) {
         syncPendingHabits()
     }
 
-    suspend fun editHabit(habitId: String, newName: String, newGoalMs: Long, newIconName: String) = withContext(Dispatchers.IO) {
-        habitDao.updateHabitDetails(habitId, newName, newGoalMs, newIconName)
+    suspend fun editHabit(habitId: String, newName: String, newGoalMs: Long, newIconName: String, newType: String = "TIME") = withContext(Dispatchers.IO) {
+        habitDao.updateHabitDetails(habitId, newName, newGoalMs, newIconName, newType)
         // Try to push the update directly
         try {
             client.postgrest["habits"].update({
                 set("name", newName)
                 set("daily_goal_ms", newGoalMs)
                 set("icon_name", newIconName)
+                set("type", newType)
             }) {
                 filter { eq("id", habitId) }
             }

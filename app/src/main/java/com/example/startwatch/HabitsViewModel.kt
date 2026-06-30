@@ -36,20 +36,20 @@ class HabitsViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun addHabit(name: String, dailyGoalMs: Long, iconName: String) {
+    fun addHabit(name: String, dailyGoalMs: Long, iconName: String, type: String = "TIME") {
         viewModelScope.launch {
             try {
-                repository.addHabit(name, dailyGoalMs, iconName)
+                repository.addHabit(name, dailyGoalMs, iconName, type)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
 
-    fun editHabit(habitId: String, name: String, dailyGoalMs: Long, iconName: String) {
+    fun editHabit(habitId: String, name: String, dailyGoalMs: Long, iconName: String, type: String = "TIME") {
         viewModelScope.launch {
             try {
-                repository.editHabit(habitId, name, dailyGoalMs, iconName)
+                repository.editHabit(habitId, name, dailyGoalMs, iconName, type)
             } catch (e: Exception) {
                 e.printStackTrace()
             }

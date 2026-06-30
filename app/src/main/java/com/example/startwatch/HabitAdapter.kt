@@ -36,18 +36,24 @@ class HabitAdapter(
             binding.textHabitName.text = habit.name
             
             // Format time nicely (e.g. 1h 30m)
-            val totalSeconds = habit.totalTimeSpent / 1000
-            val hours = totalSeconds / 3600
-            val minutes = (totalSeconds % 3600) / 60
-            val seconds = totalSeconds % 60
-            
-            val timeString = buildString {
-                if (hours > 0) append("${hours}h ")
-                if (minutes > 0 || hours > 0) append("${minutes}m ")
-                append("${seconds}s")
+            if (habit.type == "TIME") {
+                val totalSeconds = habit.totalTimeSpent / 1000
+                val hours = totalSeconds / 3600
+                val minutes = (totalSeconds % 3600) / 60
+                val seconds = totalSeconds % 60
+                
+                val timeString = buildString {
+                    if (hours > 0) append("${hours}h ")
+                    if (minutes > 0 || hours > 0) append("${minutes}m ")
+                    append("${seconds}s")
+                }
+                
+                binding.textHabitTotalTime.text = "Total time: $timeString"
+            } else if (habit.type == "REPETITION") {
+                binding.textHabitTotalTime.text = "Total reps: ${habit.totalTimeSpent}"
+            } else {
+                binding.textHabitTotalTime.text = "Completed ${habit.totalTimeSpent} times"
             }
-            
-            binding.textHabitTotalTime.text = "Total time: $timeString"
 
             var iconResId = binding.root.context.resources.getIdentifier(habit.iconName, "drawable", binding.root.context.packageName)
             if (iconResId == 0) iconResId = R.drawable.ic_timer
@@ -64,9 +70,15 @@ class HabitAdapter(
                 val color = evaluator.evaluate(progressRatio.toFloat(), Color.RED, Color.GREEN) as Int
                 binding.progressHabitDaily.progressTintList = ColorStateList.valueOf(color)
                 
-                val spentMin = habit.todayTimeSpent / 60000
-                val goalMin = habit.dailyGoalMs / 60000
-                binding.textHabitDailyProgress.text = "${spentMin}m / ${goalMin}m"
+                if (habit.type == "TIME") {
+                    val spentMin = habit.todayTimeSpent / 60000
+                    val goalMin = habit.dailyGoalMs / 60000
+                    binding.textHabitDailyProgress.text = "${spentMin}m / ${goalMin}m"
+                } else if (habit.type == "REPETITION") {
+                    binding.textHabitDailyProgress.text = "${habit.todayTimeSpent} / ${habit.dailyGoalMs}"
+                } else {
+                    binding.textHabitDailyProgress.text = if (habit.todayTimeSpent > 0) "Done" else "Not done"
+                }
                 
                 if (habit.todayTimeSpent >= habit.dailyGoalMs) {
                     binding.iconCheckmark.visibility = View.VISIBLE

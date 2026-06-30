@@ -43,6 +43,7 @@ class FirstFragment : Fragment() {
                     putString("habitId", habit.id)
                     putString("habitName", habit.name)
                     putLong("dailyGoalMs", habit.dailyGoalMs)
+                    putString("habitType", habit.type)
                 }
                 findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment, bundle)
             },
@@ -95,6 +96,12 @@ class FirstFragment : Fragment() {
         // I will just find it by traversing or we can cast it. I'll search by text for safety if ID isn't known, or just leave it.
 
         val nameInput = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.edit_habit_name)
+        val toggleHabitType = dialogView.findViewById<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.toggle_habit_type)
+        val textGoalLabel = dialogView.findViewById<android.widget.TextView>(R.id.text_goal_label)
+        val layoutTimePicker = dialogView.findViewById<android.widget.LinearLayout>(R.id.layout_time_picker)
+        val layoutRepetitionPicker = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.layout_repetition_picker)
+        val editRepetitionTarget = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.edit_repetition_target)
+
         val pickerHours = dialogView.findViewById<android.widget.NumberPicker>(R.id.picker_hours)
         val pickerMinutes = dialogView.findViewById<android.widget.NumberPicker>(R.id.picker_minutes)
         val pickerSeconds = dialogView.findViewById<android.widget.NumberPicker>(R.id.picker_seconds)
@@ -114,12 +121,53 @@ class FirstFragment : Fragment() {
         var selectedIconName = "ic_timer"
         var selectedIconResId = R.drawable.ic_timer
 
+        toggleHabitType.addOnButtonCheckedListener { group, checkedId, isChecked ->
+            if (isChecked) {
+                when (checkedId) {
+                    R.id.btn_type_time -> {
+                        textGoalLabel.visibility = View.VISIBLE
+                        layoutTimePicker.visibility = View.VISIBLE
+                        layoutRepetitionPicker.visibility = View.GONE
+                    }
+                    R.id.btn_type_repetition -> {
+                        textGoalLabel.visibility = View.VISIBLE
+                        layoutTimePicker.visibility = View.GONE
+                        layoutRepetitionPicker.visibility = View.VISIBLE
+                    }
+                    R.id.btn_type_boolean -> {
+                        textGoalLabel.visibility = View.GONE
+                        layoutTimePicker.visibility = View.GONE
+                        layoutRepetitionPicker.visibility = View.GONE
+                    }
+                }
+            }
+        }
+
         if (habitToEdit != null) {
             titleText?.text = "Edit Habit"
             nameInput.setText(habitToEdit.name)
-            pickerHours.value = (habitToEdit.dailyGoalMs / 3600000).toInt()
-            pickerMinutes.value = ((habitToEdit.dailyGoalMs % 3600000) / 60000).toInt()
-            pickerSeconds.value = ((habitToEdit.dailyGoalMs % 60000) / 1000).toInt()
+            
+            when (habitToEdit.type) {
+                "TIME" -> {
+                    toggleHabitType.check(R.id.btn_type_time)
+                    pickerHours.value = (habitToEdit.dailyGoalMs / 3600000).toInt()
+                    pickerMinutes.value = ((habitToEdit.dailyGoalMs % 3600000) / 60000).toInt()
+                    pickerSeconds.value = ((habitToEdit.dailyGoalMs % 60000) / 1000).toInt()
+                }
+                "REPETITION" -> {
+                    toggleHabitType.check(R.id.btn_type_repetition)
+                    editRepetitionTarget.setText(habitToEdit.dailyGoalMs.toString())
+                }
+                "BOOLEAN" -> {
+                    toggleHabitType.check(R.id.btn_type_boolean)
+                }
+            }
+            
+            // Disable type change for existing habits
+            for (i in 0 until toggleHabitType.childCount) {
+                toggleHabitType.getChildAt(i).isEnabled = false
+            }
+            
             selectedIconName = habitToEdit.iconName
             selectedIconResId = resources.getIdentifier(selectedIconName, "drawable", requireContext().packageName)
             if (selectedIconResId == 0) selectedIconResId = R.drawable.ic_timer
@@ -197,16 +245,35 @@ class FirstFragment : Fragment() {
 
         buttonAdd.setOnClickListener {
             val name = nameInput.text?.toString() ?: ""
-            val hours = pickerHours.value
-            val minutes = pickerMinutes.value
-            val seconds = pickerSeconds.value
-            val dailyGoalMs = (hours * 3600L + minutes * 60L + seconds) * 1000L
+            val selectedTypeId = toggleHabitType.checkedButtonId
+            
+            var dailyGoalMs = 0L
+            var typeStr = "TIME"
+            
+            when (selectedTypeId) {
+                R.id.btn_type_time -> {
+                    val hours = pickerHours.value
+                    val minutes = pickerMinutes.value
+                    val seconds = pickerSeconds.value
+                    dailyGoalMs = (hours * 3600L + minutes * 60L + seconds) * 1000L
+                    typeStr = "TIME"
+                }
+                R.id.btn_type_repetition -> {
+                    val target = editRepetitionTarget.text?.toString()?.toLongOrNull() ?: 0L
+                    dailyGoalMs = target
+                    typeStr = "REPETITION"
+                }
+                R.id.btn_type_boolean -> {
+                    dailyGoalMs = 1L
+                    typeStr = "BOOLEAN"
+                }
+            }
 
             if (name.isNotBlank()) {
                 if (habitToEdit == null) {
-                    viewModel.addHabit(name, dailyGoalMs, selectedIconName)
+                    viewModel.addHabit(name, dailyGoalMs, selectedIconName, typeStr)
                 } else {
-                    viewModel.editHabit(habitToEdit.id, name, dailyGoalMs, selectedIconName)
+                    viewModel.editHabit(habitToEdit.id, name, dailyGoalMs, selectedIconName, typeStr)
                 }
                 dialog.dismiss()
             }

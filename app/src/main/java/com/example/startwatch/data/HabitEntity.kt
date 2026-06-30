@@ -14,6 +14,7 @@ data class HabitEntity(
     val totalTimeSpent: Long = 0L,
     val dailyGoalMs: Long = 0L,
     val iconName: String = "ic_timer",
+    val type: String = "TIME",
     val syncStatus: String = "SYNCED", // SYNCED, PENDING_INSERT, PENDING_UPDATE
     val userId: String? = null // For future Google Auth
 )
@@ -24,7 +25,8 @@ fun HabitEntity.toDomainModel() = Habit(
     createdAt = this.createdAt,
     totalTimeSpent = this.totalTimeSpent,
     dailyGoalMs = this.dailyGoalMs,
-    iconName = this.iconName
+    iconName = this.iconName,
+    type = this.type
 )
 
 fun Habit.toEntity(syncStatus: String = "SYNCED", userId: String? = null) = HabitEntity(
@@ -34,6 +36,7 @@ fun Habit.toEntity(syncStatus: String = "SYNCED", userId: String? = null) = Habi
     totalTimeSpent = this.totalTimeSpent,
     dailyGoalMs = this.dailyGoalMs,
     iconName = this.iconName,
+    type = this.type,
     syncStatus = syncStatus,
     userId = userId
 )
@@ -45,5 +48,6 @@ data class HabitWithProgress(
     val totalTimeSpent: Long,
     val dailyGoalMs: Long,
     val iconName: String,
+    val type: String,
     val todayTimeSpent: Long
 )

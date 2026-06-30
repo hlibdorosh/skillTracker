@@ -35,6 +35,7 @@ class SecondFragment : Fragment() {
     private var habitId: String = ""
     private var habitName: String = ""
     private var currentDailyGoalMs = 0L
+    private var habitType: String = "TIME"
     
     private var isRunning = false
     private var startTime = 0L
@@ -57,18 +58,46 @@ class SecondFragment : Fragment() {
         habitId = arguments?.getString("habitId") ?: return
         habitName = arguments?.getString("habitName") ?: "Habit Details"
         currentDailyGoalMs = arguments?.getLong("dailyGoalMs", 0L) ?: 0L
+        habitType = arguments?.getString("habitType") ?: "TIME"
         
         binding.textHabitTitle.text = habitName
         updateDailyGoalText()
 
         viewModel.loadSessions(habitId)
 
-        // Setup Stopwatch
-        binding.buttonStartStop.setOnClickListener {
-            if (isRunning) {
-                showStopConfirmationDialog()
-            } else {
-                startTimer()
+        // Setup Type Specific UI
+        when (habitType) {
+            "TIME" -> {
+                binding.layoutTypeTime.visibility = View.VISIBLE
+                binding.layoutTypeRepetition.visibility = View.GONE
+                binding.layoutTypeBoolean.visibility = View.GONE
+                
+                binding.buttonStartStop.setOnClickListener {
+                    if (isRunning) {
+                        showStopConfirmationDialog()
+                    } else {
+                        startTimer()
+                    }
+                }
+            }
+            "REPETITION" -> {
+                binding.layoutTypeTime.visibility = View.GONE
+                binding.layoutTypeRepetition.visibility = View.VISIBLE
+                binding.layoutTypeBoolean.visibility = View.GONE
+                
+                binding.buttonRepetitionAdd.setOnClickListener {
+                    val addAmount = binding.editRepetitionAdd.text?.toString()?.toLongOrNull() ?: 1L
+                    viewModel.saveSession(habitId, addAmount)
+                }
+            }
+            "BOOLEAN" -> {
+                binding.layoutTypeTime.visibility = View.GONE
+                binding.layoutTypeRepetition.visibility = View.GONE
+                binding.layoutTypeBoolean.visibility = View.VISIBLE
+                
+                binding.buttonBooleanDone.setOnClickListener {
+                    viewModel.saveSession(habitId, 1L)
+                }
             }
         }
 
@@ -92,14 +121,18 @@ class SecondFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.dailyTotals.collect { totalsMap ->
                     val totalMs = totalsMap.values.sumOf { it.first }
-                    binding.textTotalStats.text = "Total time spent: ${formatTime(totalMs)}"
+                    binding.textTotalStats.text = "Total: ${formatProgress(totalMs)}"
                     
                     val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                     val todayStr = dateFormat.format(Date())
                     todayTotalMs = totalsMap[todayStr]?.first ?: 0L
                     
-                    if (!isRunning) {
-                        binding.stopwatch.text = formatTimeMs(todayTotalMs)
+                    if (habitType == "TIME") {
+                        if (!isRunning) {
+                            binding.stopwatch.text = formatTimeMs(todayTotalMs)
+                        }
+                    } else if (habitType == "REPETITION") {
+                        binding.textRepetitionCount.text = todayTotalMs.toString()
                     }
                     
                     refreshCalendarData()
@@ -117,7 +150,9 @@ class SecondFragment : Fragment() {
             val sessionGoalMs = pair?.second ?: 0L
             val effectiveGoalMs = if (sessionGoalMs > 0) sessionGoalMs else currentDailyGoalMs
             val checkmark = if (effectiveGoalMs > 0 && dailyTotalMs >= effectiveGoalMs) " ✅" else ""
-            binding.textDailyStats.text = "Time spent: ${formatTime(dailyTotalMs)}$checkmark"
+            
+            val statText = if (habitType == "TIME") "Time spent: " else "Completed: "
+            binding.textDailyStats.text = "$statText ${formatProgress(dailyTotalMs)}$checkmark"
         }
         binding.calendarRecyclerView.layoutManager = GridLayoutManager(requireContext(), 7)
         binding.calendarRecyclerView.addItemDecoration(CalendarStreakDecoration(calendarAdapter))
@@ -233,21 +268,41 @@ class SecondFragment : Fragment() {
     }
     
     private fun updateDailyGoalText() {
-        if (currentDailyGoalMs > 0) {
-            val totalSeconds = currentDailyGoalMs / 1000
-            val hours = totalSeconds / 3600
-            val minutes = (totalSeconds % 3600) / 60
-            val seconds = totalSeconds % 60
-            
-            val timeStr = buildString {
-                if (hours > 0) append("${hours}h ")
-                if (minutes > 0 || hours > 0) append("${minutes}m ")
-                append("${seconds}s")
-            }.trim()
-            
-            binding.textDailyGoal.text = "Daily Goal: $timeStr"
+        if (habitType == "TIME") {
+            if (currentDailyGoalMs > 0) {
+                val totalSeconds = currentDailyGoalMs / 1000
+                val hours = totalSeconds / 3600
+                val minutes = (totalSeconds % 3600) / 60
+                val seconds = totalSeconds % 60
+                
+                val timeStr = buildString {
+                    if (hours > 0) append("${hours}h ")
+                    if (minutes > 0 || hours > 0) append("${minutes}m ")
+                    append("${seconds}s")
+                }.trim()
+                
+                binding.textDailyGoal.text = "Daily Goal: $timeStr"
+            } else {
+                binding.textDailyGoal.text = "Daily Goal: Not set"
+            }
+        } else if (habitType == "REPETITION") {
+            if (currentDailyGoalMs > 0) {
+                binding.textDailyGoal.text = "Daily Goal: $currentDailyGoalMs reps"
+            } else {
+                binding.textDailyGoal.text = "Daily Goal: Not set"
+            }
         } else {
-            binding.textDailyGoal.text = "Daily Goal: Not set"
+            binding.textDailyGoal.text = "Daily Goal: Done"
+        }
+    }
+
+    private fun formatProgress(amount: Long): String {
+        return if (habitType == "TIME") {
+            formatTime(amount)
+        } else if (habitType == "REPETITION") {
+            "$amount reps"
+        } else {
+            if (amount > 0) "Done ($amount times)" else "Not done"
         }
     }
 

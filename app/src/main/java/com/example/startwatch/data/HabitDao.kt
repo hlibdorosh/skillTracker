@@ -14,7 +14,7 @@ interface HabitDao {
     fun getAllHabitsFlow(): Flow<List<HabitEntity>>
 
     @Query("""
-        SELECT h.id, h.name, h.createdAt, h.totalTimeSpent, h.dailyGoalMs, h.iconName,
+        SELECT h.id, h.name, h.createdAt, h.totalTimeSpent, h.dailyGoalMs, h.iconName, h.type,
                COALESCE(SUM(s.durationMs), 0) as todayTimeSpent
         FROM habits h
         LEFT JOIN habit_sessions s ON h.id = s.habitId AND s.dateStarted = :todayDate
@@ -47,8 +47,8 @@ interface HabitDao {
     @Query("UPDATE habits SET syncStatus = :status WHERE id = :id")
     fun updateHabitSyncStatus(id: String, status: String): Int
 
-    @Query("UPDATE habits SET name = :newName, dailyGoalMs = :newGoalMs, iconName = :newIconName, syncStatus = :status WHERE id = :id")
-    fun updateHabitDetails(id: String, newName: String, newGoalMs: Long, newIconName: String, status: String = "PENDING_UPDATE"): Int
+    @Query("UPDATE habits SET name = :newName, dailyGoalMs = :newGoalMs, iconName = :newIconName, type = :newType, syncStatus = :status WHERE id = :id")
+    fun updateHabitDetails(id: String, newName: String, newGoalMs: Long, newIconName: String, newType: String, status: String = "PENDING_UPDATE"): Int
 
     @Query("DELETE FROM habits WHERE id = :id")
     fun deleteHabit(id: String)
