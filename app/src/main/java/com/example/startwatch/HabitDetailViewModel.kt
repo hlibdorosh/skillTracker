@@ -20,9 +20,9 @@ class HabitDetailViewModel(application: Application) : AndroidViewModel(applicat
     private val _sessions = MutableStateFlow<List<HabitSessionEntity>>(emptyList())
     val sessions: StateFlow<List<HabitSessionEntity>> = _sessions
 
-    // Map of Date String (yyyy-MM-dd) to total ms for that day
-    private val _dailyTotals = MutableStateFlow<Map<String, Long>>(emptyMap())
-    val dailyTotals: StateFlow<Map<String, Long>> = _dailyTotals
+    // Map of Date String (yyyy-MM-dd) to Pair<TotalMs, GoalMs>
+    private val _dailyTotals = MutableStateFlow<Map<String, Pair<Long, Long>>>(emptyMap())
+    val dailyTotals: StateFlow<Map<String, Pair<Long, Long>>> = _dailyTotals
 
     fun loadSessions(habitId: String) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -32,11 +32,12 @@ class HabitDetailViewModel(application: Application) : AndroidViewModel(applicat
                 val data = database.habitDao().getSessionsForHabit(habitId)
                 _sessions.value = data
                 
-                // Calculate daily totals
-                val totals = mutableMapOf<String, Long>()
+                // Calculate daily totals and historical goals
+                val totals = mutableMapOf<String, Pair<Long, Long>>()
                 for (session in data) {
-                    val current = totals.getOrDefault(session.dateStarted, 0L)
-                    totals[session.dateStarted] = current + session.durationMs
+                    val currentPair = totals.getOrDefault(session.dateStarted, Pair(0L, session.goalMs))
+                    val newTotal = currentPair.first + session.durationMs
+                    totals[session.dateStarted] = Pair(newTotal, session.goalMs) // Keep latest session's goal as day's goal
                 }
                 _dailyTotals.value = totals
             } catch (e: Exception) {
@@ -68,13 +69,4 @@ class HabitDetailViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun updateDailyGoal(habitId: String, newGoalMs: Long) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                repository.updateDailyGoal(habitId, newGoalMs)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
 }

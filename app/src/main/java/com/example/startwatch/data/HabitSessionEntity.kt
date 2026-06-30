@@ -12,6 +12,7 @@ data class HabitSessionEntity(
     val habitId: String,
     val durationMs: Long,
     val dateStarted: String,
+    val goalMs: Long = 0L,
     val syncStatus: String = "SYNCED",
     val userId: String? = null
 )
@@ -20,7 +21,8 @@ fun HabitSessionEntity.toDomainModel() = HabitSession(
     id = this.id,
     habitId = this.habitId,
     durationMs = this.durationMs,
-    dateStarted = this.dateStarted
+    dateStarted = this.dateStarted,
+    goalMs = this.goalMs
 )
 
 fun HabitSession.toEntity(syncStatus: String = "SYNCED", userId: String? = null) = HabitSessionEntity(
@@ -28,6 +30,7 @@ fun HabitSession.toEntity(syncStatus: String = "SYNCED", userId: String? = null)
     habitId = this.habitId,
     durationMs = this.durationMs,
     dateStarted = this.dateStarted,
+    goalMs = this.goalMs,
     syncStatus = syncStatus,
     userId = userId
 )

@@ -14,29 +14,15 @@
 
         <TextView
             android:id="@+id/text_habit_title"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:layout_marginEnd="16dp"
             android:textAppearance="?attr/textAppearanceHeadline4"
-            app:layout_constraintEnd_toStartOf="@+id/icon_delete"
+            android:gravity="center_horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             tools:text="Reading" />
-
-        <ImageView
-            android:id="@+id/icon_delete"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_marginTop="16dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:focusable="true"
-            android:padding="4dp"
-            android:src="@drawable/ic_trash"
-            app:tint="?attr/colorError"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:id="@+id/stopwatch"
@@ -78,18 +64,6 @@
                 android:textAppearance="?attr/textAppearanceBody1"
                 android:textColor="?android:attr/textColorSecondary"
                 tools:text="Daily Goal: 30m 00s" />
-
-            <ImageView
-                android:id="@+id/icon_edit_goal"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_marginStart="8dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true"
-                android:padding="2dp"
-                android:src="@drawable/ic_edit"
-                app:tint="?attr/colorPrimary" />
         </LinearLayout>
 
         <View

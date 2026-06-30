@@ -8,5 +8,6 @@ data class HabitSession(
     @SerialName("id") val id: String? = null,
     @SerialName("habit_id") val habitId: String,
     @SerialName("date_started") val dateStarted: String,
-    @SerialName("duration_ms") val durationMs: Long
+    @SerialName("duration_ms") val durationMs: Long,
+    @SerialName("goal_ms") val goalMs: Long = 0L
 )

@@ -12,12 +12,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.startwatch.data.HabitWithProgress
 import com.example.startwatch.databinding.ItemHabitBinding
 
-class HabitAdapter(private val onItemClick: (HabitWithProgress) -> Unit) :
-    ListAdapter<HabitWithProgress, HabitAdapter.HabitViewHolder>(HabitDiffCallback()) {
+class HabitAdapter(
+    private val onItemClick: (HabitWithProgress) -> Unit,
+    private val onItemLongClick: (HabitWithProgress) -> Unit
+) : ListAdapter<HabitWithProgress, HabitAdapter.HabitViewHolder>(HabitDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): HabitViewHolder {
         val binding = ItemHabitBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return HabitViewHolder(binding, onItemClick)
+        return HabitViewHolder(binding, onItemClick, onItemLongClick)
     }
 
     override fun onBindViewHolder(holder: HabitViewHolder, position: Int) {
@@ -26,7 +28,8 @@ class HabitAdapter(private val onItemClick: (HabitWithProgress) -> Unit) :
 
     class HabitViewHolder(
         private val binding: ItemHabitBinding,
-        private val onItemClick: (HabitWithProgress) -> Unit
+        private val onItemClick: (HabitWithProgress) -> Unit,
+        private val onItemLongClick: (HabitWithProgress) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(habit: HabitWithProgress) {
@@ -45,6 +48,10 @@ class HabitAdapter(private val onItemClick: (HabitWithProgress) -> Unit) :
             }
             
             binding.textHabitTotalTime.text = "Total time: $timeString"
+
+            var iconResId = binding.root.context.resources.getIdentifier(habit.iconName, "drawable", binding.root.context.packageName)
+            if (iconResId == 0) iconResId = R.drawable.ic_timer
+            binding.iconTimer.setImageResource(iconResId)
 
             if (habit.dailyGoalMs > 0) {
                 binding.progressHabitDaily.visibility = View.VISIBLE
@@ -74,6 +81,10 @@ class HabitAdapter(private val onItemClick: (HabitWithProgress) -> Unit) :
 
             binding.root.setOnClickListener {
                 onItemClick(habit)
+            }
+            binding.root.setOnLongClickListener {
+                onItemLongClick(habit)
+                true
             }
         }
     }

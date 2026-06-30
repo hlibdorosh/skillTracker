@@ -37,14 +37,19 @@ class FirstFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        adapter = HabitAdapter { habit ->
-            val bundle = Bundle().apply {
-                putString("habitId", habit.id)
-                putString("habitName", habit.name)
-                putLong("dailyGoalMs", habit.dailyGoalMs)
+        adapter = HabitAdapter(
+            onItemClick = { habit ->
+                val bundle = Bundle().apply {
+                    putString("habitId", habit.id)
+                    putString("habitName", habit.name)
+                    putLong("dailyGoalMs", habit.dailyGoalMs)
+                }
+                findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment, bundle)
+            },
+            onItemLongClick = { habit ->
+                showHabitDialog(habit)
             }
-            findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment, bundle)
-        }
+        )
 
         binding.recyclerViewHabits.layoutManager = LinearLayoutManager(context)
         binding.recyclerViewHabits.adapter = adapter
@@ -73,16 +78,29 @@ class FirstFragment : Fragment() {
 
         // Add Habit FAB
         binding.fabAddHabit.setOnClickListener {
-            showAddHabitDialog()
+            showHabitDialog(null)
         }
     }
 
-    private fun showAddHabitDialog() {
+    private fun showHabitDialog(habitToEdit: com.example.startwatch.data.HabitWithProgress?) {
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_habit, null)
+        
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .create()
+
+        val titleText = dialogView.findViewById<android.widget.TextView>(R.id.text_dialog_title) ?: dialogView.findViewWithTag<android.widget.TextView>("title")
+        // If we don't have an ID, we'll just skip the title change or rely on layout changes.
+        // Wait, dialog_add_habit.xml has a TextView for the title. Let me search for it... it has text="New Habit". 
+        // I will just find it by traversing or we can cast it. I'll search by text for safety if ID isn't known, or just leave it.
+
         val nameInput = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.edit_habit_name)
         val pickerHours = dialogView.findViewById<android.widget.NumberPicker>(R.id.picker_hours)
         val pickerMinutes = dialogView.findViewById<android.widget.NumberPicker>(R.id.picker_minutes)
         val pickerSeconds = dialogView.findViewById<android.widget.NumberPicker>(R.id.picker_seconds)
+        val buttonAdd = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.button_add)
+        val buttonCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.button_cancel)
+        val buttonDelete = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.button_delete)
 
         pickerHours.minValue = 0
         pickerHours.maxValue = 23
@@ -93,25 +111,112 @@ class FirstFragment : Fragment() {
         pickerSeconds.minValue = 0
         pickerSeconds.maxValue = 59
 
-        AlertDialog.Builder(requireContext())
-            .setTitle("New Habit")
-            .setView(dialogView)
-            .setPositiveButton("Add") { dialog, _ ->
-                val name = nameInput.text?.toString() ?: ""
-                val hours = pickerHours.value
-                val minutes = pickerMinutes.value
-                val seconds = pickerSeconds.value
-                val dailyGoalMs = (hours * 3600L + minutes * 60L + seconds) * 1000L
+        var selectedIconName = "ic_timer"
+        var selectedIconResId = R.drawable.ic_timer
 
-                if (name.isNotBlank()) {
-                    viewModel.addHabit(name, dailyGoalMs)
+        if (habitToEdit != null) {
+            titleText?.text = "Edit Habit"
+            nameInput.setText(habitToEdit.name)
+            pickerHours.value = (habitToEdit.dailyGoalMs / 3600000).toInt()
+            pickerMinutes.value = ((habitToEdit.dailyGoalMs % 3600000) / 60000).toInt()
+            pickerSeconds.value = ((habitToEdit.dailyGoalMs % 60000) / 1000).toInt()
+            selectedIconName = habitToEdit.iconName
+            selectedIconResId = resources.getIdentifier(selectedIconName, "drawable", requireContext().packageName)
+            if (selectedIconResId == 0) selectedIconResId = R.drawable.ic_timer
+            buttonAdd.text = "Save"
+            
+            buttonDelete.visibility = android.view.View.VISIBLE
+            buttonDelete.setOnClickListener {
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("Delete Habit?")
+                    .setMessage("Are you sure you want to permanently delete this habit and all its sessions?")
+                    .setPositiveButton("Delete") { _, _ ->
+                        viewModel.deleteHabit(habitToEdit.id)
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
+
+        // Setup the Expandable Icon Picker Header
+        val layoutHeader = dialogView.findViewById<android.view.View>(R.id.layout_selected_icon_header)
+        val iconPreview = dialogView.findViewById<android.widget.ImageView>(R.id.icon_selected_preview)
+        val iconExpandIndicator = dialogView.findViewById<android.widget.ImageView>(R.id.icon_expand_indicator)
+        val recyclerIcons = dialogView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.recycler_icons)
+        
+        iconPreview.setImageResource(selectedIconResId)
+
+        layoutHeader.setOnClickListener {
+            if (recyclerIcons.visibility == android.view.View.GONE) {
+                recyclerIcons.visibility = android.view.View.VISIBLE
+                iconExpandIndicator.setImageResource(R.drawable.ic_chevron_left)
+            } else {
+                recyclerIcons.visibility = android.view.View.GONE
+                iconExpandIndicator.setImageResource(R.drawable.ic_chevron_right)
+            }
+        }
+
+        // Load all ic_ icons dynamically
+        val iconList = mutableListOf<Pair<String, Int>>()
+        val drawableClass = R.drawable::class.java
+        for (field in drawableClass.declaredFields) {
+            val name = field.name
+            // Basic filtering to capture our downloaded vector drawables and standard ones
+            if (name.startsWith("ic_") && !name.contains("launcher") && !name.contains("background")) {
+                try {
+                    val resId = field.getInt(null)
+                    iconList.add(Pair(name, resId))
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+        }
+        
+        // Sort to have the defaults at the top, just for convenience
+        val defaultIcons = listOf("ic_timer", "ic_book", "ic_fitness", "ic_code", "ic_water")
+        iconList.sortBy { 
+            val index = defaultIcons.indexOf(it.first)
+            if (index != -1) index else 100 
+        }
+
+        val iconAdapter = IconPickerAdapter(iconList, selectedIconName) { name, resId ->
+            selectedIconName = name
+            selectedIconResId = resId
+            iconPreview.setImageResource(resId)
+            
+            // Auto collapse when an icon is selected (optional but nice UI)
+            recyclerIcons.visibility = android.view.View.GONE
+            iconExpandIndicator.setImageResource(R.drawable.ic_chevron_right)
+        }
+        
+        recyclerIcons.layoutManager = androidx.recyclerview.widget.GridLayoutManager(requireContext(), 4, androidx.recyclerview.widget.RecyclerView.HORIZONTAL, false)
+        recyclerIcons.adapter = iconAdapter
+
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+
+        buttonAdd.setOnClickListener {
+            val name = nameInput.text?.toString() ?: ""
+            val hours = pickerHours.value
+            val minutes = pickerMinutes.value
+            val seconds = pickerSeconds.value
+            val dailyGoalMs = (hours * 3600L + minutes * 60L + seconds) * 1000L
+
+            if (name.isNotBlank()) {
+                if (habitToEdit == null) {
+                    viewModel.addHabit(name, dailyGoalMs, selectedIconName)
+                } else {
+                    viewModel.editHabit(habitToEdit.id, name, dailyGoalMs, selectedIconName)
                 }
                 dialog.dismiss()
             }
-            .setNegativeButton("Cancel") { dialog, _ ->
-                dialog.cancel()
-            }
-            .show()
+        }
+
+        buttonCancel.setOnClickListener {
+            dialog.cancel()
+        }
+
+        dialog.show()
     }
 
     override fun onDestroyView() {

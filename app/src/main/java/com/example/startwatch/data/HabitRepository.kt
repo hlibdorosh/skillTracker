@@ -17,13 +17,14 @@ class HabitRepository(private val habitDao: HabitDao) {
         return habitDao.getHabitsWithTodayProgressFlow(todayStr)
     }
 
-    suspend fun addHabit(name: String, dailyGoalMs: Long) = withContext(Dispatchers.IO) {
+    suspend fun addHabit(name: String, dailyGoalMs: Long, iconName: String) = withContext(Dispatchers.IO) {
         val habit = HabitEntity(
             id = UUID.randomUUID().toString(),
             userId = "local_user",
             name = name,
             createdAt = java.time.Instant.now().toString(),
             dailyGoalMs = dailyGoalMs,
+            iconName = iconName,
             syncStatus = "PENDING_INSERT"
         )
         habitDao.insertHabit(habit)
@@ -31,11 +32,16 @@ class HabitRepository(private val habitDao: HabitDao) {
     }
 
     suspend fun addSessionAndUpdateTotal(habitId: String, durationMs: Long, dateStarted: String) = withContext(Dispatchers.IO) {
+        // Fetch current habit goal to save as historical record
+        val habit = habitDao.getHabitById(habitId)
+        val currentGoalMs = habit?.dailyGoalMs ?: 0L
+
         val session = HabitSessionEntity(
             id = UUID.randomUUID().toString(),
             habitId = habitId,
             durationMs = durationMs,
             dateStarted = dateStarted,
+            goalMs = currentGoalMs,
             syncStatus = "PENDING_INSERT"
         )
         habitDao.insertSession(session)
@@ -45,18 +51,20 @@ class HabitRepository(private val habitDao: HabitDao) {
         syncPendingHabits()
     }
 
-    suspend fun updateDailyGoal(habitId: String, newGoalMs: Long) = withContext(Dispatchers.IO) {
-        habitDao.updateDailyGoal(habitId, newGoalMs)
+    suspend fun editHabit(habitId: String, newName: String, newGoalMs: Long, newIconName: String) = withContext(Dispatchers.IO) {
+        habitDao.updateHabitDetails(habitId, newName, newGoalMs, newIconName)
         // Try to push the update directly
         try {
             client.postgrest["habits"].update({
+                set("name", newName)
                 set("daily_goal_ms", newGoalMs)
+                set("icon_name", newIconName)
             }) {
                 filter { eq("id", habitId) }
             }
             habitDao.updateHabitSyncStatus(habitId, "SYNCED")
         } catch (e: Exception) {
-            Log.e("HabitRepository", "Failed to sync updateDailyGoal: ${e.message}")
+            Log.e("HabitRepository", "Failed to sync editHabit: ${e.message}")
         }
     }
 

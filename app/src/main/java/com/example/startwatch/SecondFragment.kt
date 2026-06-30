@@ -72,26 +72,8 @@ class SecondFragment : Fragment() {
             }
         }
 
-        // Setup Edit Goal
-        binding.iconEditGoal.setOnClickListener {
-            showEditGoalDialog()
-        }
-
         // Setup Custom Calendar
         setupCustomCalendar()
-
-        // Setup Delete Button
-        binding.iconDelete.setOnClickListener {
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle("Delete Habit?")
-                .setMessage("Are you sure you want to permanently delete this habit and all its sessions?")
-                .setPositiveButton("Delete") { _, _ ->
-                    viewModel.deleteHabit(habitId)
-                    findNavController().navigateUp()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
-        }
 
         // Intercept Back Button
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : androidx.activity.OnBackPressedCallback(true) {
@@ -109,12 +91,12 @@ class SecondFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.dailyTotals.collect { totalsMap ->
-                    val totalMs = totalsMap.values.sum()
+                    val totalMs = totalsMap.values.sumOf { it.first }
                     binding.textTotalStats.text = "Total time spent: ${formatTime(totalMs)}"
                     
                     val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                     val todayStr = dateFormat.format(Date())
-                    todayTotalMs = totalsMap[todayStr] ?: 0L
+                    todayTotalMs = totalsMap[todayStr]?.first ?: 0L
                     
                     if (!isRunning) {
                         binding.stopwatch.text = formatTimeMs(todayTotalMs)
@@ -130,11 +112,15 @@ class SecondFragment : Fragment() {
         calendarAdapter = CalendarAdapter { selectedDate ->
             val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val selectedDateStr = dateFormat.format(selectedDate)
-            val dailyTotalMs = viewModel.dailyTotals.value[selectedDateStr] ?: 0L
-            val checkmark = if (currentDailyGoalMs > 0 && dailyTotalMs >= currentDailyGoalMs) " ✅" else ""
-            binding.textDailyStats.text = "Time spent on selected day: ${formatTime(dailyTotalMs)}$checkmark"
+            val pair = viewModel.dailyTotals.value[selectedDateStr]
+            val dailyTotalMs = pair?.first ?: 0L
+            val sessionGoalMs = pair?.second ?: 0L
+            val effectiveGoalMs = if (sessionGoalMs > 0) sessionGoalMs else currentDailyGoalMs
+            val checkmark = if (effectiveGoalMs > 0 && dailyTotalMs >= effectiveGoalMs) " ✅" else ""
+            binding.textDailyStats.text = "Time spent: ${formatTime(dailyTotalMs)}$checkmark"
         }
         binding.calendarRecyclerView.layoutManager = GridLayoutManager(requireContext(), 7)
+        binding.calendarRecyclerView.addItemDecoration(CalendarStreakDecoration(calendarAdapter))
         binding.calendarRecyclerView.adapter = calendarAdapter
 
         binding.buttonPrevMonth.setOnClickListener {
@@ -263,38 +249,6 @@ class SecondFragment : Fragment() {
         } else {
             binding.textDailyGoal.text = "Daily Goal: Not set"
         }
-    }
-    
-    private fun showEditGoalDialog() {
-        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_edit_goal, null)
-        
-        val pickerHours = dialogView.findViewById<NumberPicker>(R.id.picker_hours).apply {
-            minValue = 0
-            maxValue = 23
-            value = (currentDailyGoalMs / 3600000).toInt()
-        }
-        val pickerMinutes = dialogView.findViewById<NumberPicker>(R.id.picker_minutes).apply {
-            minValue = 0
-            maxValue = 59
-            value = ((currentDailyGoalMs % 3600000) / 60000).toInt()
-        }
-        val pickerSeconds = dialogView.findViewById<NumberPicker>(R.id.picker_seconds).apply {
-            minValue = 0
-            maxValue = 59
-            value = ((currentDailyGoalMs % 60000) / 1000).toInt()
-        }
-        
-        MaterialAlertDialogBuilder(requireContext())
-            .setView(dialogView)
-            .setPositiveButton("Save") { _, _ ->
-                val newGoalMs = (pickerHours.value * 3600000L) + (pickerMinutes.value * 60000L) + (pickerSeconds.value * 1000L)
-                currentDailyGoalMs = newGoalMs
-                updateDailyGoalText()
-                viewModel.updateDailyGoal(habitId, newGoalMs)
-                refreshCalendarData()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun formatTime(ms: Long): String {
